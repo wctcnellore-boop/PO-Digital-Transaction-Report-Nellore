@@ -8,18 +8,17 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="63 Offices Daily Report Generator", layout="centered")
 
 st.title("📊 Daily Digital Transactions Report Generator")
-st.write("Upload your raw data files to instantly generate the clean, formatted Excel report.")
+st.write("Upload your raw daily data file below to instantly generate the clean, formatted Excel report.")
 
-# File Uploaders
+# Only Daily Data file uploader (Office list is loaded automatically from GitHub)
 uploaded_data = st.file_uploader("Upload DailyData Excel File", type=["xlsx", "xls"])
-uploaded_list = st.file_uploader("Upload OfficeList Excel File", type=["xlsx", "xls"])
 
-if uploaded_data and uploaded_list:
+if uploaded_data:
     if st.button("🚀 Generate Report", type="primary"):
         with st.spinner("Processing data, purging zeros, and formatting report..."):
-            # Load raw data
+            # Load raw data and permanent office list from repository
             df_data = pd.read_excel(uploaded_data, sheet_name=0)
-            df_list = pd.read_excel(uploaded_list, sheet_name=0)
+            df_list = pd.read_excel("OfficeList.xlsx", sheet_name=0)
             
             # Load office lookup list (Column A)
             target_offices = set(df_list.iloc[:, 0].astype(str).str.strip().str.upper())
@@ -30,7 +29,6 @@ if uploaded_data and uploaded_list:
             # Filter rows where Office Name exists in OfficeList
             filtered_df = df_data[df_data.iloc[:, 1].str.upper().isin(target_offices)].copy()
             
-            # Extract required columns mapping (0-based): B=1 (Office), D=3 (Cash), P=15 (DQR), T=19 (POS-Card), V=21 (POS-QR), Z=25 (UPI)
             output_rows = []
             
             for _, row in filtered_df.iterrows():
@@ -44,7 +42,6 @@ if uploaded_data and uploaded_list:
                 total_digital = dqr_cnt + pos_card_cnt + pos_qr_cnt + epay_cnt
                 total_trans = cash_cnt + total_digital
                 
-                # PURGE ZERO TOTAL TRANSACTIONS
                 if total_trans > 0:
                     pct_digital = (total_digital / total_trans) if total_trans > 0 else 0.0
                     output_rows.append({
@@ -61,10 +58,6 @@ if uploaded_data and uploaded_list:
             
             report_df = pd.DataFrame(output_rows)
             
-            # 3-LEVEL SORT:
-            # 1. % Digital -> Ascending
-            # 2. Cash Count -> Descending
-            # 3. Total Digital -> Ascending
             report_df.sort_values(
                 by=["% of Digital Transactions", "Cash (Cnt)", "Total Digital Transactions"],
                 ascending=[True, False, True],
@@ -72,12 +65,10 @@ if uploaded_data and uploaded_list:
             )
             report_df.reset_index(drop=True, inplace=True)
             
-            # Build OpenPyXL Workbook in Memory
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.title = "DailyReport"
             
-            # Title Banner
             report_date = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
             ws.merge_cells("A1:I1")
             title_cell = ws["A1"]
@@ -87,17 +78,15 @@ if uploaded_data and uploaded_list:
             title_cell.alignment = Alignment(horizontal="center", vertical="center")
             ws.row_dimensions[1].height = 30
             
-            # Table Headers
             headers = ["Office Name", "Cash (Cnt)", "DQR Scan (Cnt)", "SBI POS-CARD (Cnt)", 
                        "SBI POS BHARAT QR (Cnt)", "SBI E PAY UPI (Cnt)", 
                        "Total Digital Transactions", "Total Transactions", "% of Digital Transactions"]
             formulas = ["a", "b", "c", "d", "e", "f", "g=c+d+e+f", "h=b+g", "i=(g/h)*100"]
             
-            ws.append([]) # Row 2 Blank
-            ws.append(headers) # Row 3
-            ws.append(formulas) # Row 4
+            ws.append([]) 
+            ws.append(headers) 
+            ws.append(formulas) 
             
-            # Header Styles
             header_fill = PatternFill(start_color="A9D08E", end_color="A9D08E", fill_type="solid")
             for r in [3, 4]:
                 ws.row_dimensions[r].height = 24
@@ -107,7 +96,6 @@ if uploaded_data and uploaded_list:
                     cell.fill = header_fill
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             
-            # Populate Data Rows
             start_row = 5
             for row_idx, data in report_df.iterrows():
                 r = start_row + row_idx
@@ -124,13 +112,11 @@ if uploaded_data and uploaded_list:
             end_row = start_row + len(report_df) - 1
             total_row = end_row + 1
             
-            # Total Row Formulas
             ws.cell(row=total_row, column=1, value="Total")
             for col_idx, col_let in enumerate(["B", "C", "D", "E", "F", "G", "H"], start=2):
                 ws.cell(row=total_row, column=col_idx, value=f"=SUM({col_let}5:{col_let}{end_row})")
             ws.cell(row=total_row, column=9, value=f"=IFERROR(G{total_row}/H{total_row}, 0)")
             
-            # Formatting Data Rows & Total Row
             thin_border = Border(
                 left=Side(style='thin', color='000000'),
                 right=Side(style='thin', color='000000'),
