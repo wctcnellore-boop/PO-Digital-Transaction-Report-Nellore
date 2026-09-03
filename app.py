@@ -13,12 +13,10 @@ st.write(
     " formatted Excel report for all 63 offices."
 )
 
-# File uploader supporting both Excel and CSV formats
 uploaded_file = st.file_uploader(
     "Upload DailyData Excel or CSV File", type=["xlsx", "xls", "csv"]
 )
 
-# Automatically load the office list reference file from the GitHub repository
 office_list_path = "OfficeList.xlsx"
 
 try:
@@ -29,7 +27,6 @@ except Exception as e:
 
 if uploaded_file is not None and office_df is not None:
   try:
-    # Conditional reading based on file type
     if uploaded_file.name.endswith(".csv"):
       daily_df = pd.read_csv(uploaded_file)
     else:
@@ -37,20 +34,28 @@ if uploaded_file is not None and office_df is not None:
 
     st.success("Files loaded successfully! Processing your report...")
 
-    # --- DATA TRANSFORMATION & MERGING LOGIC ---
-    # Merge the uploaded daily transactions with your official 63 offices reference list.
-    # Adjust the key column names ('Office ID' or 'Office Name') to match your exact file structure.
-    if "Office ID" in daily_df.columns and "Office ID" in office_df.columns:
-      merged_df = pd.merge(
-          office_df, daily_df, on="Office ID", how="left"
-      ).fillna(0)
-    else:
-      # Fallback merge or raw processing if column names differ
-      merged_df = pd.merge(
-          office_df, daily_df, on="Office Name", how="left"
-      ).fillna(0)
+    # --- SAFE DYNAMIC MERGING LOGIC ---
+    # Automatically find common columns or match by index if names differ
+    common_cols = [
+        col for col in daily_df.columns if col in office_df.columns
+    ]
 
-    # Display preview of processed report
+    if len(common_cols) > 0:
+      # Use the first matching column (like Office ID)
+      match_col = common_cols[0]
+      office_df[match_col] = office_df[match_col].astype(str)
+      daily_df[match_col] = daily_df[match_col].astype(str)
+      merged_df = pd.merge(office_df, daily_df, on=match_col, how="left").fillna(
+          0
+      )
+    else:
+      # Fallback: if columns don't match by name, join side-by-side or keep office list intact
+      merged_df = office_df.copy()
+      for col in daily_df.columns:
+        if col not in merged_df.columns:
+          merged_df[col] = daily_df[col]
+      merged_df = merged_df.fillna(0)
+
     st.write("Preview of Formatted Report:", merged_df.head())
 
     # --- GENERATE EXCEL DOWNLOAD FILE ---
@@ -59,7 +64,6 @@ if uploaded_file is not None and office_df is not None:
       merged_df.to_excel(writer, index=False, sheet_name="Daily Report")
     processed_data = output.getvalue()
 
-    # Download button trigger
     st.download_button(
         label="📥 Download Formatted Daily Report",
         data=processed_data,
