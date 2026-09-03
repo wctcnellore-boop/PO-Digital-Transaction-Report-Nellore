@@ -35,7 +35,6 @@ if uploaded_file is not None and office_df is not None:
     st.success("Files loaded successfully! Processing report...")
 
     # --- 1. EXTRACT TARGET OFFICES FROM OFFICE LIST ---
-    # Assuming Column A of OfficeList.xlsx contains office names
     target_offices = set(
         office_df.iloc[:, 0].dropna().astype(str).str.strip().str.lower()
     )
@@ -45,13 +44,6 @@ if uploaded_file is not None and office_df is not None:
     }
 
     # --- 2. MAP COLUMNS BASED ON VBA SPECIFICATION ---
-    # Column B (index 1): Office Name
-    # Column D (index 3): Cash (Cnt)
-    # Column P (index 15): DQR Scan (Cnt)
-    # Column T (index 19): SBI POS-CARD (Cnt)
-    # Column V (index 21): SBI POS BHARAT QR (Cnt)
-    # Column Z (index 25): SBI E PAY UPI (Cnt)
-
     processed_rows = []
 
     for idx, row in daily_df.iterrows():
@@ -61,7 +53,6 @@ if uploaded_file is not None and office_df is not None:
       if lookup_name in target_offices:
         official_name = office_name_mapping[lookup_name]
 
-        # Extract values safely using .iat / .iloc indices
         cash_val = float(row.iloc[3]) if len(row) > 3 and pd.notnull(row.iloc[3]) else 0.0
         dqr_val = float(row.iloc[15]) if len(row) > 15 and pd.notnull(row.iloc[15]) else 0.0
         pos_card_val = float(row.iloc[19]) if len(row) > 19 and pd.notnull(row.iloc[19]) else 0.0
@@ -71,7 +62,6 @@ if uploaded_file is not None and office_df is not None:
         total_digi = dqr_val + pos_card_val + pos_qr_val + epay_val
         total_trans = cash_val + total_digi
 
-        # STRICT FILTER: Skip if total transactions = 0
         if total_trans > 0:
           pct_digi = (total_digi / total_trans) if total_trans > 0 else 0.0
           processed_rows.append({
@@ -91,10 +81,7 @@ if uploaded_file is not None and office_df is not None:
     if result_df.empty:
       st.warning("No matching records found with transactions greater than 0!")
     else:
-      # --- 3. THREE-LEVEL SORTING (matching VBA sort keys) ---
-      # Priority 1: % of Digital Transactions (Ascending)
-      # Priority 2: Cash Count (Descending)
-      # Priority 3: Total Digital Transactions (Ascending)
+      # --- 3. THREE-LEVEL SORTING ---
       result_df = result_df.sort_values(
           by=[
               "% of Digital Transactions",
@@ -104,13 +91,12 @@ if uploaded_file is not None and office_df is not None:
           ascending=[True, False, True],
       ).reset_index(drop=True)
 
-      # --- 4. BUILD EXCEL WORKBOOK WITH OPENPYXL FOR FORMATTING ---
+      # --- 4. BUILD EXCEL WORKBOOK ---
       output = io.BytesIO()
       wb = openpyxl.Workbook()
       ws = wb.active
       ws.title = "DailyReport"
 
-      # Report Date (Yesterday)
       report_date = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
 
       # Title Banner (A1:I1)
@@ -175,7 +161,8 @@ if uploaded_file is not None and office_df is not None:
             horizontal="center", vertical="center", wrap_text=True
         )
 
-      ws.row_dimensions[3].height = 25
+      # Row 3 height updated to 63 as requested
+      ws.row_dimensions[3].height = 63
       ws.row_dimensions[4].height = 20
 
       # Insert Data Rows
@@ -199,7 +186,6 @@ if uploaded_file is not None and office_df is not None:
             row=current_row, column=6, value=row_data["SBI E PAY UPI (Cnt)"]
         ).number_format = "#,##0"
 
-        # Formulas for totals & percentages
         ws.cell(
             row=current_row,
             column=7,
@@ -214,15 +200,14 @@ if uploaded_file is not None and office_df is not None:
             value=f"=IFERROR(G{current_row}/H{current_row}, 0)",
         ).number_format = "0.00%"
 
-        # Conditional color coding for column I percentage
         pct = row_data["% of Digital Transactions"]
-        fill_color = "FA696B"  # Soft Red < 25%
+        fill_color = "FA696B"
         if pct >= 0.75:
-          fill_color = "8AD090"  # Soft Green
+          fill_color = "8AD090"
         elif pct >= 0.50:
-          fill_color = "FFEBF4"  # Soft Yellow
+          fill_color = "FFEBF4"
         elif pct >= 0.25:
-          fill_color = "FCAAA6"  # Light Orange
+          fill_color = "FCAAA6"
 
         ws.cell(row=current_row, column=9).fill = PatternFill(
             start_color=fill_color, end_color=fill_color, fill_type="solid"
@@ -247,7 +232,7 @@ if uploaded_file is not None and office_df is not None:
           value=f"=IFERROR(G{total_row}/H{total_row}, 0)",
       ).number_format = "0.00%"
 
-      # Apply borders, fonts & alignment across table
+      # Formatting borders, fonts & alignment
       thin_border = Border(
           left=Side(style="thin", color="000000"),
           right=Side(style="thin", color="000000"),
@@ -265,7 +250,6 @@ if uploaded_file is not None and office_df is not None:
           else:
             cell.alignment = Alignment(horizontal="left", vertical="center")
 
-      # Total row distinct styling
       for c in range(1, 10):
         t_cell = ws.cell(row=total_row, column=c)
         t_cell.font = Font(name="Calibri", size=11, bold=True)
@@ -279,7 +263,6 @@ if uploaded_file is not None and office_df is not None:
             right=Side(style="thin", color="000000"),
         )
 
-      # Column widths
       ws.column_dimensions["A"].width = 30
       for col_char in ["B", "C", "D", "E", "F", "G", "H", "I"]:
         ws.column_dimensions[col_char].width = 14
