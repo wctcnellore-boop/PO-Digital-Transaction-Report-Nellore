@@ -141,17 +141,18 @@ if uploaded_file is not None and office_df is not None:
           "i=(g/h)*100",
       ]
 
+      # Row 3 Header Formatting with WRAP TEXT enabled
       for col_num, h in enumerate(headers, 1):
         cell = ws.cell(row=3, column=col_num, value=h)
         cell.font = Font(name="Calibri", size=11, bold=True)
         cell.fill = PatternFill(
             start_color="A9D08E", end_color="A9D08E", fill_type="solid"
         )
-        # Explicit wrap text enabled for row 3 headers
         cell.alignment = Alignment(
             horizontal="center", vertical="center", wrap_text=True
         )
 
+      # Row 4 Sub-Header Formatting
       for col_num, sh in enumerate(sub_headers, 1):
         cell = ws.cell(row=4, column=col_num, value=sh)
         cell.font = Font(name="Calibri", size=11, bold=True)
@@ -162,6 +163,7 @@ if uploaded_file is not None and office_df is not None:
             horizontal="center", vertical="center", wrap_text=True
         )
 
+      # Row heights
       ws.row_dimensions[3].height = 63
       ws.row_dimensions[4].height = 20
 
@@ -232,7 +234,7 @@ if uploaded_file is not None and office_df is not None:
           value=f"=IFERROR(G{total_row}/H{total_row}, 0)",
       ).number_format = "0.00%"
 
-      # Formatting borders, fonts & alignment
+      # Formatting borders, fonts & alignment for table body
       thin_border = Border(
           left=Side(style="thin", color="000000"),
           right=Side(style="thin", color="000000"),
@@ -240,12 +242,18 @@ if uploaded_file is not None and office_df is not None:
           bottom=Side(style="thin", color="000000"),
       )
 
+      # Ensure wrap_text stays active on row 3 during bulk border/alignment application
       for r in range(3, total_row + 1):
         for c in range(1, 10):
           cell = ws.cell(row=r, column=c)
           cell.font = Font(name="Calibri", size=11)
           cell.border = thin_border
-          if c > 1:
+          if r == 3:
+            cell.font = Font(name="Calibri", size=11, bold=True)
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+          elif c > 1:
             cell.alignment = Alignment(horizontal="center", vertical="center")
           else:
             cell.alignment = Alignment(horizontal="left", vertical="center")
