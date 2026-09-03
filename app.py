@@ -147,6 +147,7 @@ if uploaded_file is not None and office_df is not None:
         cell.fill = PatternFill(
             start_color="A9D08E", end_color="A9D08E", fill_type="solid"
         )
+        # Explicit wrap text enabled for row 3 headers
         cell.alignment = Alignment(
             horizontal="center", vertical="center", wrap_text=True
         )
@@ -161,7 +162,6 @@ if uploaded_file is not None and office_df is not None:
             horizontal="center", vertical="center", wrap_text=True
         )
 
-      # Row 3 height updated to 63 as requested
       ws.row_dimensions[3].height = 63
       ws.row_dimensions[4].height = 20
 
